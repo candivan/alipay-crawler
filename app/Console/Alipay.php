@@ -19,6 +19,7 @@ class Alipay extends Command
 
         $app = app();
         $argv = $app->getConfig('argv');
+//        $logger->info($argv);
         if (isset($argv['alipay_account']) && isset($argv['alipay_password'])) {
             $settings = [
                 'account' => $argv['alipay_account'],
@@ -33,6 +34,8 @@ class Alipay extends Command
         if (isset($argv['port'])) {
             $settings['port'] = $argv['port'];
         }
+        $logger->info(json_encode($settings));
+
         $this->settings = $settings;
         $this->driver = new AlipayDriver($settings);
         $this->cache = $app->resolve(CacheInterface::class);
@@ -64,14 +67,28 @@ class Alipay extends Command
      * 
      * @return [type] [description]
      */
-    public function fetchHome($name = '转账', $tab = '收入', $acceptNames = '转账,收款')
+    public function fetchHome($name = 'transfer', $tab = 'income', $acceptNames = 'transfer_income')
     {
+        if($name == "transfer"){
+            $name = '转账';
+        }
+
+        if($tab == "income"){
+            $tab = '收入';
+        }
+
+         if($tab == "transfer_income"){
+             $tab = '转账,收款';
+         }
+
         if ($name == 'all') {
             $name = '全部';
         }
         $tab = $this->getTabByName($name, $tab);
+        $this->logger->info('tab'.$tab);
+
         $acceptNames = $this->getAcceptNamesByName($name, $acceptNames);
-    
+        $this->logger->info('acceptNames'.json_encode($acceptNames));
         $this->entry();
         while (true) {
             $hour = intval(date('H'));
@@ -363,8 +380,10 @@ class Alipay extends Command
     {
         $entered = false;
         $checked = $this->driver->checkLogin();
+        $this->logger->info('checked'.$checked);
         while (!$checked || !$entered) {
             if (!$checked) {
+                $this->logger->info('login');
                 $this->driver->login();
             }
             try {

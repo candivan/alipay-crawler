@@ -37,6 +37,8 @@ class Alipay extends CrawlerDriver
             'to' => '',
             'port' => '4444',
         ));
+
+//        $this->log->debug($config);
         $this->config = $resolver->resolve($config);
         $this->cookiePath = $this->cookiePath.'_'.$this->config['account'];
     }
@@ -49,7 +51,11 @@ class Alipay extends CrawlerDriver
     public function login()
     {
         //打开登陆页
+//        $this->log->info('before login ');
         $this->get('https://auth.alipay.com/login/index.htm');
+//        $this->log->info('https://auth.alipay.com/login/index.htm');
+
+        $login = false;
         try {
             $this->driver->wait(10)->until(
                 WebDriverExpectedCondition::presenceOfAllElementsLocatedBy(
@@ -66,12 +72,13 @@ class Alipay extends CrawlerDriver
             WebDriverBy::cssSelector('#J-loginMethod-tabs > li[data-status="show_login"]')
         )->click();
         //输入账号密码，故意降低输入账号速度
-        $input = $this->driver->findElement(WebDriverBy::id('J-input-user'));
+        $input = $this->driver->findElement(WebDriverBy::id('J-input-user'))->clear();
         $this->slowInput($input, $this->config['account']);
 
         $this->driver->findElement(WebDriverBy::id('password_rsainput'))
-            ->sendKeys($this->config['password'])
-            ->submit();
+            ->sendKeys($this->config['password']);
+        $this->driver->findElement(WebDriverBy::id('J-login-btn'))
+            ->click();
         //存在退出登录按钮表示登陆成功
         try {
             $this->driver->wait(10)->until(
@@ -79,12 +86,41 @@ class Alipay extends CrawlerDriver
                     WebDriverBy::id('J_logoutUrl')
                 )
             );
+            $login = true;
         } catch (TimeOutException $e) {
-            $this->log->error('Alipay.login'.PHP_EOL.$this->driver->getCurrentURL().PHP_EOL.$this->driver->getPageSource());
-            $this->asyncMail('登录失败');
-            throw $e;
+//            $this->log->error('Alipay.login'.PHP_EOL.$this->driver->getCurrentURL().PHP_EOL.$this->driver->getPageSource());
+//            $this->asyncMail('登录失败');
+            $this->log->error('登录失败');
+            $ret = $this->checkQrCode();
+            if(!$ret){
+                $this->log->info("需要扫描二维码");
+            }
+
         }
-        $this->saveCookies();
+        if($login){
+            $this->saveCookies();
+        }
+
+        return $login;
+
+    }
+
+    /*
+     * false 需要扫码
+     */
+    public function checkQrCode()
+    {
+        try{
+            $this->driver->wait(5)->until(
+                WebDriverExpectedCondition::presenceOfAllElementsLocatedBy(
+                    WebDriverBy::id('risk_qrcode_cnt')
+                )
+            );
+        }catch (TimeOutException $e) {
+           return true;
+        }
+
+        return false;
     }
 
     /**
